@@ -91,15 +91,15 @@ function createDecorator(factory) {
   return function (target, key, index) {
     var Ctor = typeof target === 'function' ? target : target.constructor;
 
-    if (!Ctor.__decorators__) {
-      Ctor.__decorators__ = [];
+    if (!Ctor.hasOwnProperty('__d')) {
+      Object.defineProperty(Ctor, '__d', { value: [], configurable: true });
     }
-
+      
     if (typeof index !== 'number') {
       index = undefined;
     }
 
-    Ctor.__decorators__.push(function (options) {
+    Ctor.__d.push(function (options) {
       return factory(options, key, index);
     });
   };
@@ -222,18 +222,25 @@ function componentFactory(Component) {
     }
   }); // decorate options
 
-  var decorators = Component.__decorators__;
-
-  if (decorators) {
-    decorators.forEach(function (fn) {
-      return fn(options);
-    });
-    delete Component.__decorators__;
-  } // find super
-
-
   var superProto = Object.getPrototypeOf(Component.prototype);
   var Super = superProto instanceof Vue ? superProto.constructor : Vue;
+
+  var decorators = Component.__d ? Component.__d : [];
+  while (superProto instanceof Vue) {
+    if (superProto.constructor.__d) {
+      decorators = decorators.concat(superProto.constructor.__d);
+    }
+    superProto = Object.getPrototypeOf(superProto.constructor.prototype);
+  }
+  
+  decorators = decorators.filter((x, i, a) => a.indexOf(x) == i);
+  
+  decorators.forEach(function (fn) {
+    return fn(options);
+  });
+  Object.defineProperty(Component, '__d', { value: [], configurable: true });
+  // super
+  
   var Extended = Super.extend(options);
   forwardStaticMembers(Extended, Component, Super);
 
